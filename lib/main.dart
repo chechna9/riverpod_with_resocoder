@@ -55,8 +55,35 @@ class CounterPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final int counter = ref.watch(counterProvider);
     // watch or read :  watch continusly listening and rebuild when value changes
+    final int counter = ref.watch(counterProvider);
+    // cant draw while build method need seperate function
+    ref.listen<int>(
+      counterProvider,
+      (previous, next) {
+        if (next >= 5) {
+          showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: const Text('Warning'),
+                content: const Text(
+                    'Counter is high , it would be better to reset it.'),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Ok'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      },
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Counter'),

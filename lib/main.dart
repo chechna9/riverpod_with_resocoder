@@ -1,8 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+// fake websocket
+abstract class WebsocketClient {
+  Stream<int> getCounterStream([int start]);
+}
+
+class FakeWebsocketClient implements WebsocketClient {
+  @override
+  Stream<int> getCounterStream([int start = 0]) async* {
+    int i = start;
+    while (true) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      yield i++;
+    }
+  }
+}
+
+final websocketClientProvider =
+    Provider<WebsocketClient>((ref) => FakeWebsocketClient());
 // autodispose dispose the and reset the state automatically
-final counterProvider = StateProvider.autoDispose<int>((ref) => 0);
+final counterProvider =
+    StreamProvider.autoDispose.family<int, int>((ref, start) {
+  final wsClien = ref.watch(websocketClientProvider);
+  return wsClien.getCounterStream(start);
+});
 
 void main() {
   runApp(
@@ -56,59 +78,24 @@ class CounterPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // watch or read :  watch continusly listening and rebuild when value changes
-    final int counter = ref.watch(counterProvider);
-    // cant draw while build method need seperate function
-    ref.listen<int>(
-      counterProvider,
-      (previous, next) {
-        if (next >= 5) {
-          showDialog(
-            context: context,
-            builder: (context) {
-              return AlertDialog(
-                title: const Text('Warning'),
-                content: const Text(
-                    'Counter is high , it would be better to reset it.'),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Ok'),
-                  ),
-                ],
-              );
-            },
-          );
-        }
-      },
-    );
+    final AsyncValue<int> counter = ref.watch(counterProvider(5));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Counter'),
-        actions: [
-          IconButton(
-              onPressed: () {
-                // invalidate and refresh: reset the state
-                // invalidate optimisez return void refresh return the init value
-                ref.invalidate(counterProvider);
-              },
-              icon: const Icon(Icons.restart_alt))
-        ],
       ),
       body: Center(
         child: Text(
-          counter.toString(),
+          // union
+          counter
+              .when(
+                data: (int value) => value,
+                error: (Object e, _) => e,
+                loading: () => 5,
+              )
+              .toString(),
           style: Theme.of(context).textTheme.displayMedium,
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () {
-          // this is mutable
-          ref.read(counterProvider.notifier).state++;
-        },
       ),
     );
   }
